@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "hardhat/console.sol";
+
+contract EnhancedToken is ERC20, Ownable, ERC20Burnable {
+    event LogMessage(string message);
+
+    struct Appliance {
+        string name;
+        uint256 price;
+        uint256 num;
+    }
+
+    mapping(string => Appliance) public appliances;
+    mapping(address => uint256) public userBalances;
+
+    constructor() ERC20("ENHANCED", "ENH") Ownable(msg.sender) {
+        appliances["Laptop"] = Appliance("Laptop", 100, 10);
+        appliances["Mouse"] = Appliance("Mouse", 50, 20);
+        appliances["Keyboard"] = Appliance("Keyboard", 30, 15);
+        appliances["Backpack"] = Appliance("Backpack", 10, 25);
+    }
+
+    function mintTokens(address account, uint256 amount) public onlyOwner {
+        _mint(account, amount);
+    }
+
+    function burnTokens(uint256 amount) public payable {
+        require(balanceOf(msg.sender) >= amount, "INSUFFICIENT FUNDS!!");
+        _burn(msg.sender, amount);
+        emit LogMessage("Burned tokens");
+    }
+
+    function transferTokens(address recipient, uint256 amount) external {
+        require(balanceOf(msg.sender) >= amount, "INSUFFICIENT FUNDS!!");
+        _transfer(msg.sender, recipient, amount);
+    }
+
+    function redeemAppliance(string memory applianceName, uint256 num) external payable {
+        require(bytes(applianceName).length > 0, "Appliance name cannot be empty");
+        require(num > 0, "Number must be greater than zero");
+        require(balanceOf(msg.sender) >= appliances[applianceName].price * num, "INSUFFICIENT FUNDS!!");
+        
+        Appliance storage appliance = appliances[applianceName];
+        require(appliance.num >= num, "Insufficient appliance quantity");
+
+        _burn(msg.sender, appliance.price * num);
+        userBalances[msg.sender] += num;
+        appliance.num -= num;
+
+        emit LogMessage("Redeemed appliance");
+    }
+
+    
+    function getUserBalance() external view returns (uint256) {
+        return userBalances[msg.sender];
+    }
+
+    
+    function withdrawUserBalance() external {
+        uint256 balance = userBalances[msg.sender];
+        require(balance > 0, "No balance to withdraw");
+
+        _mint(msg.sender, balance);
+        userBalances[msg.sender] = 0;
+
+        emit LogMessage("Withdrawn user balance");
+    }
+
+   
+    function addApplianceQuantity(string memory applianceName, uint256 num) external onlyOwner {
+        require(appliances[applianceName].price != 0, "Appliance does not exist");
+        appliances[applianceName].num += num;
+    }
+}
